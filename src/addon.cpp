@@ -1,8 +1,4 @@
-#include <chrono>
-#include <cstdint>
-#include <thread>
-
-#include "napi.h"
+#include <napi.h>
 #include "types.hpp"
 
 #ifdef _WIN32

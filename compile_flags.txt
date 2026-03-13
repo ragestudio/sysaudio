@@ -1,5 +1,6 @@
 -I/usr/include/pipewire-0.3
 -I/usr/include/spa-0.2
+-I/usr/include/node
 -I/usr/include/wine/windows
 -I./node_modules/node-addon-api
 -D_REENTRANT
