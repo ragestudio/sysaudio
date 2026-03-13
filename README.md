@@ -54,8 +54,8 @@ Start capturing system audio.
 
 **Callback signature:**
 ```javascript
-(buff: Buffer, format: { sampleRate: number, channels: number, bitsPerSample: number }) => {
-  // buff: Buffer containing audio data
+(buff: Buffer<uint8Array>, format: { sampleRate: number, channels: number, bitsPerSample: number }) => {
+  // buff: Buffer containing audio data (PCM)
   // format: Object with audio format information
 }
 ```
@@ -76,7 +76,7 @@ Stop audio capture.
 Output audio to default sink (Linux only).
 
 **Parameters:**
-- `buffer` (Buffer): Audio data to play
+- `buffer` (Buffer): Audio data to play (PCM Waveform)
 - `format` (Object): Audio format (same as capture format)
 
 ### `stop()`
