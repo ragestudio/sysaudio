@@ -1,7 +1,7 @@
 import wav from "wav"
 import { createRequire } from "module"
 
-const sysaudio = createRequire(import.meta.url)("./build/Release/sysaudio.node")
+const sysaudio = createRequire(import.meta.url)("./sysaudio.node")
 
 const file = new wav.FileWriter("./output.wav", {
 	channels: 2,
