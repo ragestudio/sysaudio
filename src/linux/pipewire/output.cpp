@@ -69,19 +69,22 @@ bool PipewireAudio::create_output_node() {
 	pw_properties *props = pw_properties_new(
 		PW_KEY_MEDIA_TYPE, "Audio",
 		PW_KEY_MEDIA_CATEGORY, "Playback",
-		PW_KEY_NODE_NAME, INPUT_NODE_NAME,
+		PW_KEY_NODE_NAME, node_name.c_str(),
 		PW_KEY_NODE_DESCRIPTION, "System-wide audio output",
-		PW_KEY_APP_ID, "comty.desktop",
-		PW_KEY_APP_NAME, "Comty",
-		PW_KEY_APP_ICON_NAME, "comty",
+		PW_KEY_APP_ID, app_id.c_str(),
+		PW_KEY_APP_NAME, app_name.c_str(),
+		PW_KEY_APP_ICON_NAME, app_icon_name.c_str(),
 		PW_KEY_NODE_VIRTUAL, "true",
 		PW_KEY_NODE_ALWAYS_PROCESS, "true",
+		PW_KEY_NODE_LATENCY, "128/44100",
+		PW_KEY_NODE_RATE, "1/44100",
+		PW_KEY_NODE_LOCK_QUANTUM, "128/44100",
 		nullptr
 	);
 
 	output_stream = pw_stream_new_simple(
 		loop,
-		INPUT_NODE_NAME,
+		node_name.c_str(),
 		props,
 		&output_stream_events,
 		this

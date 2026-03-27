@@ -43,7 +43,7 @@ class PipewireAudio {
 	PipewireAudio();
 	~PipewireAudio();
 
-	bool initialize();
+	bool initialize(const InitializeParams &params);
 	void stop();
 
 	bool start_capture(pid_t exclude_pid, AudioDataCallback callback);
@@ -108,7 +108,7 @@ class PipewireAudio {
 	// output stream
 	pw_stream *output_stream;
 	uint32_t output_stream_node_id;
-	ring_buffer::RingBuffer output_buffer{ 1024 * 1024 };
+	ring_buffer::RingBuffer output_buffer{ 64 * 1024 };	 // 64KB for lower latency
 
 	// router
 	std::unordered_map<uint32_t, pid_t> target_nodes;  // node_id -> pid
@@ -120,6 +120,12 @@ class PipewireAudio {
 	uint32_t current_format;
 	uint32_t current_rate;
 	uint32_t current_channels;
+
+	// initialization parameters
+	std::string node_name;
+	std::string app_name;
+	std::string app_id;
+	std::string app_icon_name;
 
 	// user callback
 	AudioDataCallback data_callback;

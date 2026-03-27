@@ -24,8 +24,8 @@ class SysAudioLinux {
 	SysAudioLinux(const SysAudioLinux &) = delete;
 	SysAudioLinux &operator=(const SysAudioLinux &) = delete;
 
+	bool Initialize(InitializeParams params);
 	void Stop();
-
 	bool StartCapture(pid_t excludePid, AudioDataCallback dataCallback);
 	void StopCapture();
 

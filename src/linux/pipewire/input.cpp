@@ -52,19 +52,22 @@ bool PipewireAudio::create_input_node() {
 		PW_KEY_MEDIA_TYPE, "Audio",
 		PW_KEY_MEDIA_CATEGORY, "Capture",
 		PW_KEY_MEDIA_ROLE, "Music",
-		PW_KEY_NODE_NAME, INPUT_NODE_NAME,
+		PW_KEY_NODE_NAME, node_name.c_str(),
 		PW_KEY_NODE_DESCRIPTION, "System-wide audio capture",
-		PW_KEY_APP_ID, "comty.desktop",
-		PW_KEY_APP_NAME, "Comty",
-		PW_KEY_APP_ICON_NAME, "comty",
+		PW_KEY_APP_ID, app_id.c_str(),
+		PW_KEY_APP_NAME, app_name.c_str(),
+		PW_KEY_APP_ICON_NAME, app_icon_name.c_str(),
 		PW_KEY_NODE_VIRTUAL, "true",
 		PW_KEY_NODE_ALWAYS_PROCESS, "true",
+		PW_KEY_NODE_LATENCY, "128/44100",
+		PW_KEY_NODE_RATE, "1/44100",
+		PW_KEY_NODE_LOCK_QUANTUM, "128/44100",
 		nullptr
 	);
 
 	capture_stream = pw_stream_new_simple(
 		loop,
-		INPUT_NODE_NAME,
+		node_name.c_str(),
 		props,
 		&input_stream_events,
 		this
@@ -133,7 +136,8 @@ bool PipewireAudio::create_input_node() {
 
 	// connect the stream
 	pw_stream_flags flags = static_cast<pw_stream_flags>(
-		PW_STREAM_FLAG_MAP_BUFFERS
+		PW_STREAM_FLAG_MAP_BUFFERS |
+		PW_STREAM_FLAG_RT_PROCESS
 	);
 
 	int stream_connect = pw_stream_connect(
@@ -291,17 +295,19 @@ void PipewireAudio::process_input_audio() {
 	format->bitsPerSample = utils::get_bytes_per_sample(static_cast<spa_audio_format>(current_format)) * 8;
 	format->format = current_format;
 
-	uint8_t *audio_data = new uint8_t[bytes];
-	memcpy(audio_data, data->data, bytes);
-
+	// use the buffer directly without copying
 	AudioFrame *frame = new AudioFrame{
-		audio_data,
+		static_cast<uint8_t *>(data->data),
 		format,
 		bytes
 	};
 
+	// mark that we're using the PipeWire buffer directly
+	// the callback must not free this buffer
+
 	local_callback(frame);
 
+	// don't delete the frame here - it will be deleted in the callback
 	pw_stream_queue_buffer(capture_stream, buf);
 }
 

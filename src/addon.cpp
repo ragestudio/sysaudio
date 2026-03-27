@@ -1,4 +1,7 @@
 #include <napi.h>
+
+#include <cstdio>
+
 #include "types.hpp"
 
 #ifdef _WIN32
@@ -31,7 +34,6 @@ void onAudioDataCallbackFn(Napi::Env env, Napi::Function jsCb, AudioFrame *frame
 		formatObj.Set("sampleRate", Napi::Number::New(env, frame->format->sampleRate));
 		formatObj.Set("channels", Napi::Number::New(env, frame->format->channels));
 		formatObj.Set("bitsPerSample", Napi::Number::New(env, frame->format->bitsPerSample));
-		// formatObj.Set("format", Napi::Number::New(env, frame->format.format));
 
 		// printf("Frame size: %zu\n", frame->size);
 		// printf("Frame buffer: %p\n", frame->buff);
@@ -40,13 +42,33 @@ void onAudioDataCallbackFn(Napi::Env env, Napi::Function jsCb, AudioFrame *frame
 	}
 
 	if (frame) {
-		if (frame->buff) {
-			delete[] frame->buff;
-		}
 		delete frame->format;
 		delete frame;
 	}
 };
+
+Napi::Value Initialize(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	if (info.Length() < 1 || !info[0].IsObject()) {
+		Napi::TypeError::New(env, "Invalid arguments").ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+
+	Napi::Object initializeParams = info[0].As<Napi::Object>();
+
+	InitializeParams params = {
+		.excluded_pid = initializeParams.Get("excluded_pid").As<Napi::Number>().Int32Value(),
+		.node_name = initializeParams.Get("node_name").ToString(),
+		.device_app_name = initializeParams.Get("device_app_name").ToString(),
+		.device_app_id = initializeParams.Get("device_app_id").ToString(),
+		.device_app_icon_name = initializeParams.Get("device_app_icon_name").ToString(),
+	};
+
+	engine.Initialize(params);
+
+	return Napi::Boolean::New(env, true);
+}
 
 Napi::Value StartCapture(const Napi::CallbackInfo &info) {
 	Napi::Env env = info.Env();
@@ -70,7 +92,7 @@ Napi::Value StartCapture(const Napi::CallbackInfo &info) {
 		env,
 		info[1].As<Napi::Function>(),
 		"audioCaptureDataCallback",
-		0,
+		10,	 // maximum queue size to prevent accumulation
 		1
 	);
 
@@ -142,6 +164,7 @@ Napi::Value StopEngine(const Napi::CallbackInfo &info) {
 }
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
+	exports.Set("initialize", Napi::Function::New(env, Initialize));
 	exports.Set("start_capture", Napi::Function::New(env, StartCapture));
 	exports.Set("stop_capture", Napi::Function::New(env, StopCapture));
 	exports.Set("stop", Napi::Function::New(env, StopEngine));

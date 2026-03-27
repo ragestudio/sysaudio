@@ -76,7 +76,7 @@ void registry_event_global(
 		const char *pid_str = spa_dict_lookup(props, PW_KEY_APP_PROCESS_ID);
 
 		// exclude our own node
-		if (name && strcmp(name, INPUT_NODE_NAME) == 0) {
+		if (name && strcmp(name, instance->node_name.c_str()) == 0) {
 			instance->capture_stream_node_id = id;
 			return;
 		}

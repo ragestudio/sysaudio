@@ -5,11 +5,24 @@
 
 SysAudioLinux::~SysAudioLinux() = default;
 SysAudioLinux::SysAudioLinux() : impl(std::make_unique<pipewire::PipewireAudio>()) {
-	bool ok = impl->initialize();
+}
+
+bool SysAudioLinux::Initialize(InitializeParams params) {
+	printf("[SysAudio] Initialized with params:\n");
+	printf("  excluded_pid: %d\n", params.excluded_pid);
+	printf("  node_name: %s\n", params.node_name.c_str());
+	printf("  device_app_name: %s\n", params.device_app_name.c_str());
+	printf("  device_app_id: %s\n", params.device_app_id.c_str());
+	printf("  device_app_icon_name: %s\n", params.device_app_icon_name.c_str());
+
+	bool ok = impl->initialize(params);
 
 	if (!ok) {
 		fprintf(stderr, "Failed to initialize sysaudio engine\n");
+		return false;
 	}
+
+	return true;
 }
 
 bool SysAudioLinux::StartCapture(pid_t excludePid, AudioDataCallback dataCallback) {

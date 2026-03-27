@@ -116,6 +116,10 @@ void WasapiCapture::Stop() {
 	StopCapture();
 }
 
+bool WasapiCapture::Initialize(InitializeParams params) {
+    return true;
+}
+
 void WasapiCapture::CaptureThread() {
 	HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 

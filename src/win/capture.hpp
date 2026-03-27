@@ -31,6 +31,7 @@ class WasapiCapture {
 	WasapiCapture();
 	~WasapiCapture();
 
+	bool Initialize(InitializeParams params);
 	bool StartCapture(DWORD processIdToExclude, AudioDataCallback callback);
 	void StopCapture();
 	void Stop();

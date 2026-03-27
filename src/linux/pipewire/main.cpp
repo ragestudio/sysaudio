@@ -12,7 +12,7 @@
 
 namespace pipewire {
 PipewireAudio::PipewireAudio()
-	: initialized(false), is_capturing(false), excluded_pid(0), thread_loop(nullptr), loop(nullptr), context(nullptr), core(nullptr), registry(nullptr), capture_stream(nullptr), capture_stream_node_id(0), current_format(SPA_AUDIO_FORMAT_UNKNOWN), current_rate(0), current_channels(0) {
+	: initialized(false), is_capturing(false), excluded_pid(0), thread_loop(nullptr), loop(nullptr), context(nullptr), core(nullptr), registry(nullptr), capture_stream(nullptr), capture_stream_node_id(0), current_format(SPA_AUDIO_FORMAT_UNKNOWN), current_rate(0), current_channels(0), node_name("comty-sysaudio"), app_name("Comty"), app_id("comty.desktop"), app_icon_name("comty") {
 	memset(&registry_listener, 0, sizeof(registry_listener));
 }
 
@@ -20,12 +20,26 @@ PipewireAudio::~PipewireAudio() {
 	stop();
 }
 
-bool PipewireAudio::initialize() {
+bool PipewireAudio::initialize(const InitializeParams &params) {
 	if (initialized) {
 		return false;
 	}
 
 	printf("Initializing sysaudio engine...\n");
+
+	// store initialization parameters
+	if (!params.node_name.empty()) {
+		node_name = params.node_name;
+	}
+	if (!params.device_app_name.empty()) {
+		app_name = params.device_app_name;
+	}
+	if (!params.device_app_id.empty()) {
+		app_id = params.device_app_id;
+	}
+	if (!params.device_app_icon_name.empty()) {
+		app_icon_name = params.device_app_icon_name;
+	}
 
 	// initialize pipewire
 	pw_init(nullptr, nullptr);
@@ -88,7 +102,8 @@ bool PipewireAudio::initialize() {
 		return false;
 	}
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	// brief wait for initialization
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
 	printf("SysAudio engine initialized\n");
 
