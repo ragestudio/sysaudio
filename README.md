@@ -45,6 +45,18 @@ npm run build
 
 ## API Reference
 
+### `initialize(params)`
+Initialize the engine with provided params
+
+**Parameters:**
+- `params` (object): Parameters
+
+** valid params **
+- `node_name` (string): The pipepwire node process name
+- `device_app_name` (string): Streams node app title name
+- `device_app_id` (string): Streams node app id
+- `device_app_icon_name` (string): Streams node app icon
+
 ### `start_capture(pid, callback)`
 Start capturing system audio.
 
@@ -99,6 +111,12 @@ const file = new wav.FileWriter('./output.wav', {
   channels: 2,
   sampleRate: 44100,
   bitDepth: 16,
+});
+
+// Initialize the engine
+sysaudio.initialize({
+  node_name: "test_app",
+  device_app_name: "Test",
 });
 
 // Start capturing all system audio (exclude PID 0)
