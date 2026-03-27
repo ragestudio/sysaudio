@@ -9,6 +9,12 @@ const file = new wav.FileWriter("./output.wav", {
 	bitDepth: 16,
 })
 
+sysaudio.initialize({
+	excluded_pid: 123,
+	node_name: "Default test",
+	device_app_name: "SysaudioTest",
+})
+
 sysaudio.start_capture(123, (buff, format) => {
 	file.write(buff)
 	sysaudio.output(buff, format)
