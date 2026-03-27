@@ -21,7 +21,7 @@
 #include "../../types.hpp"
 #include "ringbuffer.hpp"
 
-#define INPUT_NODE_NAME "comty-sysaudio"
+#define INPUT_NODE_NAME "sysaudio"
 
 namespace pipewire {
 
