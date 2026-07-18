@@ -106,7 +106,7 @@ class PipewireAudio {
 	// output stream
 	pw_stream *output_stream;
 	uint32_t output_stream_node_id;
-	ring_buffer::RingBuffer output_buffer{ 64 * 1024 };	 // 64KB for lower latency
+	ring_buffer::RingBuffer output_buffer{ 8 * 1024 };
 
 	// router
 	std::unordered_map<uint32_t, pid_t> target_nodes;  // node_id -> pid
