@@ -139,19 +139,17 @@ Napi::Value OutputAudio(const Napi::CallbackInfo &info) {
 
 	Napi::Object formatObj = info[1].As<Napi::Object>();
 
-	AudioFormat *format = new AudioFormat{};
+	AudioFormat format = {};
+	format.channels = formatObj.Get("channels").As<Napi::Number>().Int32Value();
+	format.sampleRate = formatObj.Get("sampleRate").As<Napi::Number>().Int32Value();
+	format.bitsPerSample = formatObj.Get("bitsPerSample").As<Napi::Number>().Int32Value();
 
-	format->channels = formatObj.Get("channels").As<Napi::Number>().Int32Value();
-	format->sampleRate = formatObj.Get("sampleRate").As<Napi::Number>().Int32Value();
-	format->bitsPerSample = formatObj.Get("bitsPerSample").As<Napi::Number>().Int32Value();
+	AudioFrame frame = {};
+	frame.buff = info[0].As<Napi::Buffer<uint8_t>>().Data();
+	frame.size = info[0].As<Napi::Buffer<uint8_t>>().Length();
+	frame.format = &format;
 
-	AudioFrame *frame = new AudioFrame{};
-
-	frame->buff = info[0].As<Napi::Buffer<uint8_t>>().Data();
-	frame->size = info[0].As<Napi::Buffer<uint8_t>>().Length();
-	frame->format = format;
-
-	engine.Output(frame);
+	engine.Output(&frame);
 	return env.Undefined();
 #else
 	Napi::Error::New(info.Env(), "OutputAudio is only supported on Linux").ThrowAsJavaScriptException();
