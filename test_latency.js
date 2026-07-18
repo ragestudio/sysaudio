@@ -142,6 +142,12 @@ console.log("Starting latency test...")
 console.log("")
 
 try {
+	sysaudio.initialize({
+		excluded_pid: 0,
+		node_name: "latency_test",
+		device_app_name: "latency_test",
+		device_app_id: "latency_test",
+	})
 	sysaudio.start_capture(process.pid, audioCallback)
 
 	// handle graceful shutdown
