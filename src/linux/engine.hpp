@@ -8,7 +8,7 @@
 #include "../types.hpp"
 #include "pipewire/main.hpp"
 
-#define INPUT_NODE_NAME "comty-sysaudio"
+#define INPUT_NODE_NAME "sysaudio"
 
 // forward declaration of implementation
 namespace pipewire {

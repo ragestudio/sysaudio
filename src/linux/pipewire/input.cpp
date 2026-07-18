@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 #include "input.hpp"
 #include "main.hpp"
@@ -295,20 +296,21 @@ void PipewireAudio::process_input_audio() {
 	format->bitsPerSample = utils::get_bytes_per_sample(static_cast<spa_audio_format>(current_format)) * 8;
 	format->format = current_format;
 
-	// use the buffer directly without copying
+	// copy data out of the PipeWire buffer before returning it
+	uint8_t *copied = new uint8_t[bytes];
+	memcpy(copied, data->data, bytes);
+
 	AudioFrame *frame = new AudioFrame{
-		static_cast<uint8_t *>(data->data),
+		copied,
 		format,
 		bytes
 	};
 
-	// mark that we're using the PipeWire buffer directly
-	// the callback must not free this buffer
-
-	local_callback(frame);
-
-	// don't delete the frame here - it will be deleted in the callback
+	// return the PipeWire buffer immediately
 	pw_stream_queue_buffer(capture_stream, buf);
+
+	// now safe to call the callback with our own copy
+	local_callback(frame);
 }
 
 void PipewireAudio::input_param_changed(uint32_t id, const struct spa_pod *param) {

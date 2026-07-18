@@ -21,8 +21,6 @@
 #include "../../types.hpp"
 #include "ringbuffer.hpp"
 
-#define INPUT_NODE_NAME "sysaudio"
-
 namespace pipewire {
 
 struct PendingPort {
