@@ -35,13 +35,11 @@ void onAudioDataCallbackFn(Napi::Env env, Napi::Function jsCb, AudioFrame *frame
 		formatObj.Set("channels", Napi::Number::New(env, frame->format->channels));
 		formatObj.Set("bitsPerSample", Napi::Number::New(env, frame->format->bitsPerSample));
 
-		// printf("Frame size: %zu\n", frame->size);
-		// printf("Frame buffer: %p\n", frame->buff);
-
 		jsCb.Call({ buffer, formatObj });
 	}
 
 	if (frame) {
+		delete[] frame->buff;
 		delete frame->format;
 		delete frame;
 	}
@@ -92,13 +90,20 @@ Napi::Value StartCapture(const Napi::CallbackInfo &info) {
 		env,
 		info[1].As<Napi::Function>(),
 		"audioCaptureDataCallback",
-		10,	 // maximum queue size to prevent accumulation
+		512,
 		1
 	);
 
 	auto onAudioData = [](AudioFrame *frame) {
 		if (audioCaptureDataCallback) {
-			audioCaptureDataCallback.NonBlockingCall(frame, onAudioDataCallbackFn);
+			napi_status status = audioCaptureDataCallback.NonBlockingCall(frame, onAudioDataCallbackFn);
+
+			if (status != napi_ok) {
+				// queue full or tsfn closed, cleanup the frame ourselves
+				delete[] frame->buff;
+				delete frame->format;
+				delete frame;
+			}
 		}
 	};
 
