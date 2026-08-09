@@ -5,6 +5,11 @@
 	"author": "ragestudio",
 	"type": "module",
 	"module": "./dist/index.js",
+	"files": [
+		"dist",
+		"LICENSE",
+		"package.json"
+	],
 	"scripts": {
 		"build": "node-gyp build && tsgo"
 	},
