@@ -1,11 +1,20 @@
 {
+	"name": "sysaudio",
+	"version": "1.0.0",
+	"license": "MIT",
+	"author": "ragestudio",
 	"type": "module",
+	"module": "./dist/index.js",
 	"scripts": {
-		"build": "node-gyp rebuild"
+		"build": "node-gyp build && tsgo"
 	},
 	"devDependencies": {
+		"@typescript/native-preview": "7.0.0-dev.20260707.2",
 		"node-addon-api": "^8.6.0",
 		"node-gyp": "^12.2.0",
 		"wav": "^1.0.2"
+	},
+	"dependencies": {
+		"@types/node": "^26.2.0"
 	}
 }
