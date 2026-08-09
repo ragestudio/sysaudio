@@ -1,6 +1,6 @@
 import { createRequire } from "module"
 
-const sysaudio = createRequire(import.meta.url)("./sysaudio.node")
+const sysaudio = createRequire(import.meta.url)("../sysaudio.node")
 
 console.log("=== Testing Custom Initialization Parameters ===\n")
 

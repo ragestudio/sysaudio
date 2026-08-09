@@ -1,7 +1,7 @@
 import { createRequire } from "module"
 import { performance } from "perf_hooks"
 
-const sysaudio = createRequire(import.meta.url)("./sysaudio.node")
+const sysaudio = createRequire(import.meta.url)("../sysaudio.node")
 
 // latency test configuration
 const TEST_DURATION_MS = 5000
