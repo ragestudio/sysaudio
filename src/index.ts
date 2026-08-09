@@ -16,7 +16,7 @@ export type InitializeParams = {
 
 export type CaptureCallback = (buff: Buffer, format: Format) => void
 
-class SysAudio {
+export class SysAudio {
 	mod: any
 
 	get _require(): NodeJS.Require {
