@@ -1,7 +1,8 @@
 #ifndef AUDIOCALLBACK_HPP
 #define AUDIOCALLBACK_HPP
-
+#ifdef __linux
 #include <sched.h>
+#endif
 
 #include <cstdint>
 #include <functional>
