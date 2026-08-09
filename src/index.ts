@@ -11,7 +11,7 @@ export type InitializeParams = {
 	node_name: string
 	device_app_name?: string
 	device_app_id?: string
-	devide_app_icon_name?: string
+	device_app_icon_name?: string
 }
 
 export type CaptureCallback = (buff: Buffer, format: Format) => void
@@ -50,7 +50,7 @@ export class SysAudio {
 		return this.mod.output(buffer, format)
 	}
 
-	output_supported = (): Boolean => {
+	output_supported = (): boolean => {
 		return this.mod.output_supported()
 	}
 }
