@@ -55,13 +55,17 @@ Napi::Value Initialize(const Napi::CallbackInfo &info) {
 
 	Napi::Object initializeParams = info[0].As<Napi::Object>();
 
-	InitializeParams params = {
-		.excluded_pid = initializeParams.Get("excluded_pid").As<Napi::Number>().Int32Value(),
-		.node_name = initializeParams.Get("node_name").ToString(),
-		.device_app_name = initializeParams.Get("device_app_name").ToString(),
-		.device_app_id = initializeParams.Get("device_app_id").ToString(),
-		.device_app_icon_name = initializeParams.Get("device_app_icon_name").ToString(),
-	};
+	InitializeParams params;
+#ifdef __linux
+	params.excluded_pid = initializeParams.Get("excluded_pid").As<Napi::Number>().Int32Value();
+	params.node_name = initializeParams.Get("node_name").ToString();
+	params.device_app_name = initializeParams.Get("device_app_name").ToString();
+	params.device_app_id = initializeParams.Get("device_app_id").ToString();
+	params.device_app_icon_name = initializeParams.Get("device_app_icon_name").ToString();
+#endif
+#ifdef _WIN32
+	params.excluded_pid = static_cast<DWORD>(initializeParams.Get("excluded_pid").As<Napi::Number>().Uint32Value());
+#endif
 
 	engine.Initialize(params);
 

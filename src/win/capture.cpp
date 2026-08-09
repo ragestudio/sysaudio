@@ -1,5 +1,4 @@
-#include <sys/types.h>
-
+// No sys/types.h
 #include <cstdio>
 #include <cstring>
 
