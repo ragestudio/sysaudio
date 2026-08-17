@@ -113,19 +113,36 @@ jobs:
           run-id: ${{ needs.resolve.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Inspect downloaded artifacts
+        run: find build-artifacts -type f
+
       - name: Assemble package (prebuilds + JS wrapper)
         run: |
+          # upload-artifact flattens directory uploads, so the files may or may
+          # not keep the dist/ prefix; resolve their location dynamically.
+          LINUX_NODE="$(find build-artifacts/sysaudio-Linux -name sysaudio.node -type f 2>/dev/null | head -1)"
+          WINDOWS_NODE="$(find build-artifacts/sysaudio-Windows -name sysaudio.node -type f 2>/dev/null | head -1)"
+
+          if [ -z "$LINUX_NODE" ] || [ -z "$WINDOWS_NODE" ]; then
+            echo "ERROR: sysaudio.node missing from build artifacts"
+            find build-artifacts -type f 2>/dev/null || true
+            exit 1
+          fi
+
+          LINUX_DIR="$(dirname "$LINUX_NODE")"
+          WINDOWS_DIR="$(dirname "$WINDOWS_NODE")"
+          echo "Linux binary at: ${LINUX_DIR}/sysaudio.node"
+          echo "Windows binary at: ${WINDOWS_DIR}/sysaudio.node"
+
           # Prebuilt binaries: dist/sysaudio.node -> prebuilds/<platform>-<arch>/sysaudio.node
           # The binary is N-API, so one file per platform works for every Node/Electron ABI.
           mkdir -p prebuilds/linux-x64 prebuilds/win32-x64
-          cp build-artifacts/sysaudio-Linux/dist/sysaudio.node prebuilds/linux-x64/sysaudio.node
-          cp build-artifacts/sysaudio-Windows/dist/sysaudio.node prebuilds/win32-x64/sysaudio.node
+          cp "$LINUX_DIR/sysaudio.node" prebuilds/linux-x64/sysaudio.node
+          cp "$WINDOWS_DIR/sysaudio.node" prebuilds/win32-x64/sysaudio.node
 
           # JavaScript wrapper from the build artifacts (identical on every platform)
           mkdir -p dist
-          cp build-artifacts/sysaudio-Linux/dist/index.js dist/
-          cp build-artifacts/sysaudio-Linux/dist/index.d.ts dist/
-          cp build-artifacts/sysaudio-Linux/dist/index.d.ts.map dist/
+          cp "$LINUX_DIR/index.js" "$LINUX_DIR/index.d.ts" "$LINUX_DIR/index.d.ts.map" dist/
 
           echo "--- dist ---"
           find dist -type f
