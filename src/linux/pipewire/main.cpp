@@ -12,7 +12,7 @@
 
 namespace pipewire {
 PipewireAudio::PipewireAudio()
-	: initialized(false), is_capturing(false), excluded_pid(0), thread_loop(nullptr), loop(nullptr), context(nullptr), core(nullptr), registry(nullptr), capture_stream(nullptr), capture_stream_node_id(0), current_format(SPA_AUDIO_FORMAT_UNKNOWN), current_rate(0), current_channels(0), node_name("comty-sysaudio"), app_name("Comty"), app_id("comty.desktop"), app_icon_name("comty") {
+	: initialized(false), is_capturing(false), excluded_pid(0), thread_loop(nullptr), loop(nullptr), context(nullptr), core(nullptr), registry(nullptr), capture_stream(nullptr), capture_stream_node_id(0), output_stream(nullptr), output_stream_node_id(0), current_format(SPA_AUDIO_FORMAT_UNKNOWN), current_rate(0), current_channels(0), node_name("comty-sysaudio"), app_name("Comty"), app_id("comty.desktop"), app_icon_name("comty"), data_callback(nullptr) {
 	memset(&registry_listener, 0, sizeof(registry_listener));
 }
 
