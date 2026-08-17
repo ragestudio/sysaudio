@@ -1,0 +1,4 @@
+# .npmignore overrides .gitignore when packing with npm.
+# The published contents are controlled by the "files" whitelist in
+# package.json (dist, prebuilds, src, binding.gyp, LICENSE, package.json),
+# so no extra exclusions are needed here.

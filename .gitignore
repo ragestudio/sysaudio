@@ -5,6 +5,7 @@ __pycache__/
 node_modules
 # C extensions
 *.so
+prebuilds/
 
 # Distribution / packaging
 .Python
