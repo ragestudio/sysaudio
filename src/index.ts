@@ -1,4 +1,5 @@
 import { createRequire } from "module"
+import { dirname } from "path"
 
 export type Format = {
 	sampleRate: number
@@ -24,7 +25,17 @@ export class SysAudio {
 	}
 
 	constructor() {
-		this.mod = this._require("./sysaudio.node")
+		const require = createRequire(import.meta.url)
+
+		// Resolve the prebuilt binary for the current platform from
+		// `prebuilds/<platform>-<arch>/` (node-gyp-build). Fall back to the
+		// locally built `./sysaudio.node` (from `node-gyp build`) when no
+		// prebuild is available, e.g. when running straight from the repo.
+		try {
+			this.mod = require("node-gyp-build")(dirname(import.meta.dirname))
+		} catch {
+			this.mod = require("./sysaudio.node")
+		}
 	}
 
 	initialize = (params: InitializeParams): void => {
@@ -51,7 +62,8 @@ export class SysAudio {
 	}
 
 	output_supported = (): boolean => {
-		return this.mod.output_supported()
+		// the native addon exports this as a boolean, not a function
+		return !!this.mod.output_supported
 	}
 }
 
