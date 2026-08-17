@@ -13,7 +13,15 @@ A cross-platform native Node.js addon for system audio capture and playback on W
 
 ## Installation
 
-### Prerequisites
+### From npm (prebuilt binaries)
+
+```bash
+npm install sysaudio
+```
+
+The package ships prebuilt N-API binaries for Linux (x64) and Windows (x64), so no build tools or platform headers are required at install time. Only the PipeWire runtime is needed on Linux.
+
+### Prerequisites (build from source only)
 
 - Node.js (v14 or higher)
 - Python 3.x and build tools (for node-gyp)
