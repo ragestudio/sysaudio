@@ -34,12 +34,27 @@
 						"include_dirs": [
 							"/usr/include/pipewire-0.3",
 							"/usr/include/spa-0.2"
-						]
+						],
+						"defines": ["NDEBUG", "NAPI_DISABLE_CPP_EXCEPTIONS"],
+						"cflags": [
+							"-Os",
+							"-flto",
+							"-ffunction-sections",
+							"-fdata-sections",
+							"-fvisibility=hidden",
+							"-fno-asynchronous-unwind-tables"
+						],
+						"ldflags": [
+							"-Wl,--gc-sections",
+							"-Wl,-s",
+							"-Wl,--build-id=none",
+							"-flto"
+						],
+						"ldflags!": ["-rdynamic"]
 					}
 				]
 			],
-			"cflags!": ["-fno-exceptions", "-Wall", "-g", "-std=c11"],
-			"cflags_cc!": ["-fno-exceptions"],
+			"cflags!": ["-Wall", "-g", "-std=c11", "-O3", "-fno-omit-frame-pointer"],
 			"product_dir": "../dist"
 		}
 	]
