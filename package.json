@@ -4,22 +4,34 @@
 	"license": "MIT",
 	"author": "ragestudio",
 	"type": "module",
+	"main": "./dist/index.js",
 	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
+		"!dist/sysaudio.node",
+		"prebuilds",
+		"src",
+		"binding.gyp",
 		"LICENSE",
 		"package.json"
 	],
 	"scripts": {
-		"build": "node-gyp build && tsgo"
+		"build": "node-gyp build && tsgo",
+		"build:js": "tsgo",
+		"prebuild:napi": "prebuildify --strip",
+		"install": "node-gyp-build",
+		"pack:dry": "npm pack --dry-run"
 	},
 	"devDependencies": {
+		"@types/node": "^26.2.0",
 		"@typescript/native-preview": "7.0.0-dev.20260707.2",
 		"node-addon-api": "^8.6.0",
 		"node-gyp": "^12.2.0",
+		"prebuildify": "^6.0.1",
 		"wav": "^1.0.2"
 	},
 	"dependencies": {
-		"@types/node": "^26.2.0"
+		"node-gyp-build": "^4.8.4"
 	}
 }
