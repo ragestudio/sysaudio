@@ -2,13 +2,8 @@ name: Build SysAudio Addon
 
 on:
   push:
-    paths-ignore:
-      - "README.md"
-      - ".gitignore"
-  pull_request:
-    paths-ignore:
-      - "README.md"
-      - ".gitignore"
+    tags:
+      - "v*"
   workflow_dispatch:
 
 jobs:

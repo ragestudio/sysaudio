@@ -1,0 +1,141 @@
+name: Publish to npm
+
+# Publishes the prebuilt binaries produced by the "Build SysAudio Addon"
+# workflow to the npm registry.
+#
+# Flow:
+#   1. Push a version tag (git tag v1.0.0 && git push origin v1.0.0). Tag
+#      pushes trigger the build workflow even with path filters (they are
+#      not evaluated for tags).
+#   2. When the build workflow completes, this workflow picks the artifacts
+#      (sysaudio-Linux, sysaudio-Windows) from that run, renames each binary
+#      into the prebuilds/<platform>-<arch>/ layout and publishes.
+#
+# The version published is the one in package.json at the commit the build
+# ran on (this workflow checks out that exact commit). Publishing a version
+# that already exists on npm will fail (npm rejects duplicates).
+#
+# A GitHub secret named NPM_TOKEN with publish rights is required.
+
+on:
+  workflow_run:
+    workflows: ["Build SysAudio Addon"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build workflow run ID whose artifacts should be published (empty = latest successful build from a v* tag)"
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve build run
+    runs-on: ubuntu-latest
+    if: github.server_url == 'https://github.com'
+    outputs:
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
+    steps:
+      - name: Resolve build run
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            echo "Build run #${RUN_ID} concluded: ${CONCLUSION}"
+
+            if [ "$CONCLUSION" != "success" ]; then
+              echo "Skipping publish: build run did not succeed"
+              echo "run_id=" >> "$GITHUB_OUTPUT"
+              echo "head_sha=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            HEAD_BRANCH="$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.head_branch // empty')"
+            echo "Build run head branch: ${HEAD_BRANCH}"
+            case "$HEAD_BRANCH" in
+              v*) ;;
+              *)
+                echo "Skipping publish: build run is not from a version tag"
+                echo "run_id=" >> "$GITHUB_OUTPUT"
+                echo "head_sha=" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+          else
+            RUN_ID="${{ inputs.run_id }}"
+            if [ -z "$RUN_ID" ]; then
+              RUN_ID="$(gh run list --workflow build.yml --status success --limit 20 --json databaseId,headBranch --jq '[.[] | select(.headBranch | startswith("v"))][0].databaseId // empty')"
+              echo "Latest successful build from a v* tag: ${RUN_ID}"
+            fi
+          fi
+
+          if [ -z "$RUN_ID" ]; then
+            echo "No build run to publish from"
+            echo "run_id=" >> "$GITHUB_OUTPUT"
+            echo "head_sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          HEAD_SHA="$(gh api "repos/${{ github.repository }}/actions/runs/${RUN_ID}" --jq '.head_sha // empty')"
+          echo "Publishing artifacts from build run #${RUN_ID} (${HEAD_SHA})"
+          echo "run_id=${RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish to npm
+    needs: resolve
+    if: needs.resolve.outputs.run_id != '' && github.server_url == 'https://github.com'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (commit the build ran on)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.head_sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build-artifacts
+          run-id: ${{ needs.resolve.outputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble package (prebuilds + JS wrapper)
+        run: |
+          # Prebuilt binaries: dist/sysaudio.node -> prebuilds/<platform>-<arch>/sysaudio.node
+          # The binary is N-API, so one file per platform works for every Node/Electron ABI.
+          mkdir -p prebuilds/linux-x64 prebuilds/win32-x64
+          cp build-artifacts/sysaudio-Linux/dist/sysaudio.node prebuilds/linux-x64/sysaudio.node
+          cp build-artifacts/sysaudio-Windows/dist/sysaudio.node prebuilds/win32-x64/sysaudio.node
+
+          # JavaScript wrapper from the build artifacts (identical on every platform)
+          mkdir -p dist
+          cp build-artifacts/sysaudio-Linux/dist/index.js dist/
+          cp build-artifacts/sysaudio-Linux/dist/index.d.ts dist/
+          cp build-artifacts/sysaudio-Linux/dist/index.d.ts.map dist/
+
+          echo "--- dist ---"
+          find dist -type f
+          echo "--- prebuilds ---"
+          find prebuilds -type f
+
+      - name: Verify package contents
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
