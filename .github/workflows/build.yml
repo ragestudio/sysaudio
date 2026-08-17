@@ -3,21 +3,19 @@ name: Build SysAudio Addon
 on:
   push:
     paths-ignore:
-      - 'README.md'
-      - '.gitignore'
+      - "README.md"
+      - ".gitignore"
   pull_request:
     paths-ignore:
-      - 'README.md'
-      - '.gitignore'
+      - "README.md"
+      - ".gitignore"
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
+  build-linux:
+    name: Build on Linux
+    runs-on: ubuntu-latest
+    if: github.server_url == 'https://github.com'
 
     steps:
       - name: Checkout repository
@@ -34,7 +32,6 @@ jobs:
           version: 11
 
       - name: Install Linux dependencies (PipeWire)
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libpipewire-0.3-dev libspa-0.2-dev
@@ -49,7 +46,41 @@ jobs:
         run: pnpm run build
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
-          name: sysaudio-${{ runner.os }}
+          name: sysaudio-Linux
+          path: dist/
+
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    if: github.server_url == 'https://github.com'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Configure node-gyp
+        run: npx node-gyp configure
+
+      - name: Build addon
+        run: pnpm run build
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: sysaudio-Windows
           path: dist/
