@@ -25,6 +25,15 @@ SysAudioLinux engine;
 #endif
 
 Napi::ThreadSafeFunction audioCaptureDataCallback;
+napi_ref sharedBufferRef = nullptr;
+
+void ReleaseCaptureCallback() {
+	if (audioCaptureDataCallback) {
+		printf("[SysAudio] Addon::ReleaseCaptureCallback > releasing tsfn\n");
+		audioCaptureDataCallback.Release();
+		audioCaptureDataCallback = nullptr;
+	}
+}
 
 void onAudioDataCallbackFn(Napi::Env env, Napi::Function jsCb, AudioFrame *frame) {
 	if (env != nullptr && jsCb != nullptr) {
@@ -75,31 +84,30 @@ Napi::Value Initialize(const Napi::CallbackInfo &info) {
 Napi::Value StartCapture(const Napi::CallbackInfo &info) {
 	Napi::Env env = info.Env();
 
-	if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsFunction()) {
+	if (info.Length() < 1 || !info[0].IsNumber()) {
 		Napi::TypeError::New(env, "Invalid arguments").ThrowAsJavaScriptException();
 		return env.Undefined();
 	}
 
 	int pid = info[0].As<Napi::Number>().Int32Value();
 
-#ifdef _WIN32
-	pid = static_cast<DWORD>(pid);
-#endif
+	// the callback is optional when a shared buffer is attached
+	ReleaseCaptureCallback();
 
-#ifdef __linux
-	pid = static_cast<pid_t>(pid);
-#endif
+	if (info.Length() >= 2 && info[1].IsFunction()) {
+		audioCaptureDataCallback = Napi::ThreadSafeFunction::New(
+			env,
+			info[1].As<Napi::Function>(),
+			"audioCaptureDataCallback",
+			512,
+			1
+		);
+	}
 
-	audioCaptureDataCallback = Napi::ThreadSafeFunction::New(
-		env,
-		info[1].As<Napi::Function>(),
-		"audioCaptureDataCallback",
-		512,
-		1
-	);
+	AudioDataCallback onAudioData = nullptr;
 
-	auto onAudioData = [](AudioFrame *frame) {
-		if (audioCaptureDataCallback) {
+	if (audioCaptureDataCallback) {
+		onAudioData = [](AudioFrame *frame) {
 			napi_status status = audioCaptureDataCallback.NonBlockingCall(frame, onAudioDataCallbackFn);
 
 			if (status != napi_ok) {
@@ -108,8 +116,8 @@ Napi::Value StartCapture(const Napi::CallbackInfo &info) {
 				delete frame->format;
 				delete frame;
 			}
-		}
-	};
+		};
+	}
 
 	printf("[SysAudio] Addon::StartCapture > starting capture\n");
 	engine.StartCapture(pid, onAudioData);
@@ -121,15 +129,68 @@ Napi::Value StopCapture(const Napi::CallbackInfo &info) {
 	printf("[SysAudio] Addon::StopCapture > stopping capture\n");
 
 	engine.StopCapture();
-
-	if (audioCaptureDataCallback) {
-		printf("[SysAudio] Addon::StopCapture > releasing tsfn\n");
-		audioCaptureDataCallback.Release();
-		audioCaptureDataCallback = nullptr;
-	}
+	ReleaseCaptureCallback();
 
 	printf("[SysAudio] Addon::StopCapture > done\n");
 	return info.Env().Undefined();
+}
+
+Napi::Value AttachSharedBuffer(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	if (info.Length() < 1 || !info[0].IsTypedArray()) {
+		Napi::TypeError::New(env, "Expected a Uint8Array view of a SharedArrayBuffer").ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+
+	Napi::TypedArray typed = info[0].As<Napi::TypedArray>();
+	Napi::ArrayBuffer buffer = typed.ArrayBuffer();
+
+	uint8_t *data = static_cast<uint8_t *>(buffer.Data()) + typed.ByteOffset();
+	size_t length = typed.ByteLength();
+
+	if (!data || length == 0) {
+		Napi::TypeError::New(env, "Shared buffer is empty").ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+
+	if (sharedBufferRef) {
+		napi_delete_reference(env, sharedBufferRef);
+		sharedBufferRef = nullptr;
+	}
+
+	engine.AttachSharedBuffer(data, length);
+
+	napi_create_reference(env, info[0], 1, &sharedBufferRef);
+
+	return Napi::Boolean::New(env, true);
+}
+
+Napi::Value DetachSharedBuffer(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	engine.DetachSharedBuffer();
+
+	if (sharedBufferRef) {
+		napi_delete_reference(env, sharedBufferRef);
+		sharedBufferRef = nullptr;
+	}
+
+	return env.Undefined();
+}
+
+Napi::Value GetFormat(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	AudioFormat format = engine.GetFormat();
+
+	Napi::Object formatObj = Napi::Object::New(env);
+	formatObj.Set("sampleRate", Napi::Number::New(env, format.sampleRate));
+	formatObj.Set("channels", Napi::Number::New(env, format.channels));
+	formatObj.Set("bitsPerSample", Napi::Number::New(env, format.bitsPerSample));
+	formatObj.Set("format", Napi::Number::New(env, format.format));
+
+	return formatObj;
 }
 
 Napi::Value OutputAudio(const Napi::CallbackInfo &info) {
@@ -176,6 +237,9 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 	exports.Set("stop_capture", Napi::Function::New(env, StopCapture));
 	exports.Set("stop", Napi::Function::New(env, StopEngine));
 	exports.Set("output", Napi::Function::New(env, OutputAudio));
+	exports.Set("attach_shared_buffer", Napi::Function::New(env, AttachSharedBuffer));
+	exports.Set("detach_shared_buffer", Napi::Function::New(env, DetachSharedBuffer));
+	exports.Set("get_format", Napi::Function::New(env, GetFormat));
 
 #ifdef __linux
 	exports.Set("output_supported", Napi::Boolean::New(env, true));
