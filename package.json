@@ -1,12 +1,31 @@
 {
 	"name": "sysaudio",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"license": "MIT",
 	"author": "ragestudio",
 	"type": "module",
 	"main": "./dist/index.js",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./native": {
+			"types": "./dist/native.d.ts",
+			"import": "./dist/native.js",
+			"default": "./dist/native.js"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts",
+			"import": "./dist/types.js",
+			"default": "./dist/types.js"
+		},
+		"./package.json": "./package.json"
+	},
 	"files": [
 		"dist",
 		"!dist/sysaudio.node",
@@ -17,18 +36,30 @@
 		"package.json"
 	],
 	"scripts": {
-		"build": "node-gyp build && tsgo",
-		"build:js": "tsgo",
+		"prepack": "npm run build && npm run prebuild:napi",
+		"configure": "node-gyp configure",
+		"configure:debug": "node-gyp configure --debug",
+		"compile-flags": "node ./scripts/generate-compile-flags.mjs",
+		"prepare:ide": "node-gyp configure && node ./scripts/generate-compile-flags.mjs",
+		"build": "node-gyp configure build && tsc",
+		"build:js": "tsc",
+		"rebuild": "node-gyp rebuild",
+		"test": "node-gyp configure build && node ./tests/test_shared_capture.js",
+		"test:shared:capture": "node-gyp configure build && node ./tests/test_shared_capture.js",
+		"test:shared:playback": "node-gyp configure build && node ./tests/test_shared_playback.js",
+		"test:callback": "node-gyp configure build && node ./tests/test_callback.js",
+		"test:loader": "node-gyp configure build && tsc && node ./tests/test_typed_loader.mjs",
+		"example:shared:echo": "node-gyp configure build && node ./tests/example_shared_echo.js",
 		"prebuild:napi": "prebuildify --strip",
 		"install": "node-gyp-build",
 		"pack:dry": "npm pack --dry-run"
 	},
 	"devDependencies": {
 		"@types/node": "^26.2.0",
-		"@typescript/native-preview": "7.0.0-dev.20260707.2",
 		"node-addon-api": "^8.6.0",
 		"node-gyp": "^12.2.0",
 		"prebuildify": "^6.0.1",
+		"typescript": "^7.0.2",
 		"wav": "^1.0.2"
 	},
 	"dependencies": {
