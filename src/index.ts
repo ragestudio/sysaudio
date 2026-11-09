@@ -1,64 +1,55 @@
-import { createRequire } from "module"
-import { dirname } from "path"
+import { loadNativeAddon } from "./native.js"
 
-export type Format = {
-	sampleRate: number
-	channels: number
-	bitsPerSample: number
-}
+import type {
+	CaptureCallback,
+	Format,
+	InitializeParams,
+	NativeSysAudioAddon,
+} from "./types.js"
 
-export type InitializeParams = {
-	excluded_pid: number | string
-	node_name: string
-	device_app_name?: string
-	device_app_id?: string
-	device_app_icon_name?: string
-}
-
-export type CaptureCallback = (buff: Buffer, format: Format) => void
+export * from "./types.js"
+export { loadNativeAddon } from "./native.js"
 
 export class SysAudio {
-	mod: any
-
-	get _require(): NodeJS.Require {
-		return createRequire(import.meta.url)
-	}
+	readonly mod: NativeSysAudioAddon
 
 	constructor() {
-		const require = createRequire(import.meta.url)
-
-		// Resolve the prebuilt binary for the current platform from
-		// `prebuilds/<platform>-<arch>/` (node-gyp-build). Fall back to the
-		// locally built `./sysaudio.node` (from `node-gyp build`) when no
-		// prebuild is available, e.g. when running straight from the repo.
-		try {
-			this.mod = require("node-gyp-build")(dirname(import.meta.dirname))
-		} catch {
-			this.mod = require("./sysaudio.node")
-		}
+		this.mod = loadNativeAddon()
 	}
 
 	initialize = (params: InitializeParams): void => {
-		return this.mod.initialize(params)
+		this.mod.initialize(params)
 	}
 
 	stop = (): void => {
-		return this.mod.stop()
+		this.mod.stop()
 	}
 
 	start_capture = (
-		excluded_pid: string | number,
-		callback: CaptureCallback,
+		excluded_pid: number,
+		callback?: CaptureCallback,
 	): void => {
-		return this.mod.start_capture(excluded_pid, callback)
+		this.mod.start_capture(excluded_pid, callback)
 	}
 
 	stop_capture = (): void => {
-		return this.mod.stop_capture()
+		this.mod.stop_capture()
 	}
 
 	output = (buffer: Buffer, format: Format): void => {
-		return this.mod.output(buffer, format)
+		this.mod.output(buffer, format)
+	}
+
+	attach_shared_buffer = (view: Uint8Array): void => {
+		this.mod.attach_shared_buffer(view)
+	}
+
+	detach_shared_buffer = (): void => {
+		this.mod.detach_shared_buffer()
+	}
+
+	get_format = (): Format => {
+		return this.mod.get_format()
 	}
 
 	output_supported = (): boolean => {
