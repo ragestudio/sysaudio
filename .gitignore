@@ -150,3 +150,7 @@ test/fixtures/out
 *.node
 
 package-lock.json
+
+# ide
+compile_commands.json
+compile_flags.txt
