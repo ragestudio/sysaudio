@@ -90,12 +90,13 @@ class AudioActivator : public IActivateAudioInterfaceCompletionHandler, public I
 WasapiCapture::WasapiCapture() : m_isCapturing(false), m_pAudioClient(nullptr), m_pCaptureClient(nullptr), m_pwfx(nullptr) {}
 WasapiCapture::~WasapiCapture() { StopCapture(); }
 
-bool WasapiCapture::StartCapture(DWORD processIdToExclude, AudioDataCallback callback) {
+bool WasapiCapture::StartCapture(int processIdToExclude, AudioDataCallback callback) {
 	if (m_isCapturing) return false;
 
-	m_processIdToExclude = processIdToExclude;
+	m_processIdToExclude = static_cast<DWORD>(processIdToExclude);
 	m_callback = callback;
 	m_isCapturing = true;
+	shared_buffer.set_capture_active(true);
 	m_captureThread = std::thread(&WasapiCapture::CaptureThread, this);
 
 	return true;
@@ -104,6 +105,7 @@ bool WasapiCapture::StartCapture(DWORD processIdToExclude, AudioDataCallback cal
 void WasapiCapture::StopCapture() {
 	if (m_isCapturing) {
 		m_isCapturing = false;
+		shared_buffer.set_capture_active(false);
 
 		if (m_captureThread.joinable()) {
 			m_captureThread.join();
@@ -115,8 +117,21 @@ void WasapiCapture::Stop() {
 	StopCapture();
 }
 
-bool WasapiCapture::Initialize(InitializeParams params) {
-    return true;
+void WasapiCapture::Output(AudioFrame * /*frame*/) {
+	// output is not implemented on windows
+}
+
+AudioFormat WasapiCapture::GetFormat() const {
+	AudioFormat format = {};
+	format.sampleRate = m_sampleRate;
+	format.channels = m_channels;
+	format.bitsPerSample = m_bitsPerSample;
+	format.format = 0;
+	return format;
+}
+
+bool WasapiCapture::Initialize(const InitializeParams & /*params*/) {
+	return true;
 }
 
 void WasapiCapture::CaptureThread() {
@@ -216,6 +231,11 @@ void WasapiCapture::CaptureThread() {
 		pFormat = pMixFormat;
 	}
 
+	m_sampleRate = pFormat->nSamplesPerSec;
+	m_channels = pFormat->nChannels;
+	m_bitsPerSample = pFormat->wBitsPerSample;
+	shared_buffer.set_format(m_sampleRate, m_channels, m_bitsPerSample, 0);
+
 	DWORD flags = AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
 	// Calculate buffer duration (100ms = 10,000,000 hundred-nanosecond units)
 	REFERENCE_TIME bufferDuration = 10000000;  // 100ms
@@ -272,45 +292,54 @@ void WasapiCapture::CaptureThread() {
 
 			hr = m_pCaptureClient->GetBuffer(&pData, &numFramesAvailable, &bufferFlags, &devicePosition, &qpcPosition);
 
-			AudioFormat *aFormat = new AudioFormat;
-
-			aFormat->sampleRate = pFormat->nSamplesPerSec;
-			aFormat->bitsPerSample = pFormat->wBitsPerSample;
-			aFormat->channels = pFormat->nChannels;
-
-			AudioFrame *aFrame = new AudioFrame;
-
-			aFrame->format = aFormat;
-			aFrame->size = numFramesAvailable * pFormat->nBlockAlign;
-
 			if (SUCCEEDED(hr)) {
 				if (numFramesAvailable > 0) {
-					// Always copy the buffer data to ensure it remains valid after ReleaseBuffer
-					size_t bufferSize = numFramesAvailable * pFormat->nBlockAlign;
-					uint8_t *bufferCopy = new uint8_t[bufferSize];
+					const size_t bufferSize = numFramesAvailable * pFormat->nBlockAlign;
 
-					if (bufferFlags & AUDCLNT_BUFFERFLAGS_SILENT) {
-						memset(bufferCopy, 0, bufferSize);
+					if (!m_callback && shared_buffer.is_attached()) {
+						if (bufferFlags & AUDCLNT_BUFFERFLAGS_SILENT) {
+							m_silence.assign(bufferSize, 0);
+							shared_buffer.write_capture(m_silence.data(), bufferSize);
+						} else {
+							shared_buffer.write_capture(pData, bufferSize);
+						}
 					} else {
-						memcpy(bufferCopy, pData, bufferSize);
+						AudioFormat *aFormat = new AudioFormat;
+						aFormat->sampleRate = pFormat->nSamplesPerSec;
+						aFormat->bitsPerSample = pFormat->wBitsPerSample;
+						aFormat->channels = pFormat->nChannels;
+						aFormat->format = 0;
+
+						AudioFrame *aFrame = new AudioFrame;
+						aFrame->format = aFormat;
+						aFrame->size = bufferSize;
+
+						uint8_t *bufferCopy = new uint8_t[bufferSize];
+
+						if (bufferFlags & AUDCLNT_BUFFERFLAGS_SILENT) {
+							memset(bufferCopy, 0, bufferSize);
+						} else {
+							memcpy(bufferCopy, pData, bufferSize);
+						}
+
+						aFrame->buff = bufferCopy;
+
+						if (m_callback) {
+							m_callback(aFrame);
+						} else {
+							delete[] aFrame->buff;
+							delete aFrame->format;
+							delete aFrame;
+						}
 					}
 
-					aFrame->buff = bufferCopy;
-					aFrame->size = bufferSize;
-
-					m_callback(aFrame);
 					m_pCaptureClient->ReleaseBuffer(numFramesAvailable);
 				} else {
 					printf("[WASAPI DEBUG] No frames available in buffer\n");
-
-					delete aFrame->format;
-					delete aFrame;
 					m_pCaptureClient->ReleaseBuffer(0);
 				}
 			} else {
 				printf("[WASAPI DEBUG] GetBuffer failed\n");
-				delete aFrame->format;
-				delete aFrame;
 			}
 
 			hr = m_pCaptureClient->GetNextPacketSize(&packetLength);

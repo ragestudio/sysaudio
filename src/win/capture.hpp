@@ -14,9 +14,11 @@
 #include <windows.h>
 
 #include <atomic>
+#include <cstdint>
 #include <thread>
+#include <vector>
 
-#include "../types.hpp"
+#include "../backends/audio_backend.hpp"
 
 const GUID GUID_SUBTYPE_IEEE_FLOAT = {
 	0x00000003, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 }
@@ -26,15 +28,17 @@ const GUID GUID_SUBTYPE_PCM = {
 	0x00000001, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71 }
 };
 
-class WasapiCapture {
+class WasapiCapture : public AudioBackend {
    public:
 	WasapiCapture();
 	~WasapiCapture();
 
-	bool Initialize(InitializeParams params);
-	bool StartCapture(DWORD processIdToExclude, AudioDataCallback callback);
-	void StopCapture();
-	void Stop();
+	bool Initialize(const InitializeParams &params) override;
+	bool StartCapture(int exclude_pid, AudioDataCallback callback) override;
+	void StopCapture() override;
+	void Stop() override;
+	void Output(AudioFrame *frame) override;
+	AudioFormat GetFormat() const override;
 
    private:
 	void CaptureThread();
@@ -50,4 +54,9 @@ class WasapiCapture {
 	IAudioClient *m_pAudioClient;
 	IAudioCaptureClient *m_pCaptureClient;
 	WAVEFORMATEX *m_pwfx;
+
+	std::vector<uint8_t> m_silence;
+	uint32_t m_sampleRate = 0;
+	uint32_t m_channels = 0;
+	uint32_t m_bitsPerSample = 0;
 };
