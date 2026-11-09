@@ -218,10 +218,17 @@ sysaudio.start_capture(5678, (buff, format) => {
 src/
 ├── addon.cpp              # Main Node.js addon entry point
 ├── types.hpp             # Common type definitions
+├── backends/
+│   ├── audio_backend.hpp # Shared backend interface + buffers
+│   ├── ringbuffer.hpp   # Generic byte ring buffer
+│   └── shared_buffer.hpp # Shared memory ring buffers
 ├── linux/
-│   ├── engine.cpp       # Linux audio engine
-│   ├── engine.hpp
-│   └── pipewire/        # PipeWire implementation
+│   ├── engine.cpp       # Single pipewire engine (thread loop, streams,
+│   ├── engine.hpp       #   router, formats and shared buffer transport)
+│   ├── input.cpp        # Capture stream events
+│   ├── output.cpp       # Playback stream events
+│   ├── router.cpp       # Node/port registry router
+│   └── utils.cpp        # Format and process helpers
 └── win/
     ├── capture.cpp      # Windows WASAPI capture
     └── capture.hpp
