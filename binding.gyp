@@ -24,11 +24,10 @@
 					{
 						"sources": [
 							"src/linux/engine.cpp",
-							"src/linux/pipewire/utils.cpp",
-							"src/linux/pipewire/router.cpp",
-							"src/linux/pipewire/input.cpp",
-							"src/linux/pipewire/output.cpp",
-							"src/linux/pipewire/main.cpp"
+							"src/linux/utils.cpp",
+							"src/linux/router.cpp",
+							"src/linux/input.cpp",
+							"src/linux/output.cpp"
 						],
 						"libraries": ["-lpipewire-0.3"],
 						"include_dirs": [

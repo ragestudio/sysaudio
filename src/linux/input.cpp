@@ -2,43 +2,37 @@
 #include <cstdio>
 #include <cstring>
 
-#include "input.hpp"
-#include "main.hpp"
-#include "pipewire/thread-loop.h"
+#include "engine.hpp"
 #include "utils.hpp"
 
-namespace pipewire {
-void input_process(void *userdata) {
-	PipewireAudio *instance = static_cast<PipewireAudio *>(userdata);
-	instance->process_input_audio();
-}
-
-void input_param_changed(void *userdata, uint32_t id, const struct spa_pod *param) {
-	PipewireAudio *instance = static_cast<PipewireAudio *>(userdata);
-	instance->input_param_changed(id, param);
-}
-
-void input_state_changes(void *userdata, enum pw_stream_state old, enum pw_stream_state state, const char *error) {
-	PipewireAudio *instance = static_cast<PipewireAudio *>(userdata);
-	instance->input_state_changes(old, state, error);
-}
-
-static const struct pw_stream_events input_stream_events = {
+const struct pw_stream_events SysAudioLinux::input_stream_events = {
 	.version = PW_VERSION_STREAM_EVENTS,
 	.destroy = nullptr,
-	.state_changed = input_state_changes,
+	.state_changed = &SysAudioLinux::input_state_changes_cb,
 	.control_info = nullptr,
 	.io_changed = nullptr,
-	.param_changed = input_param_changed,
+	.param_changed = &SysAudioLinux::input_param_changed_cb,
 	.add_buffer = nullptr,
 	.remove_buffer = nullptr,
-	.process = input_process,
+	.process = &SysAudioLinux::input_process_cb,
 	.drained = nullptr,
 	.command = nullptr,
 	.trigger_done = nullptr,
 };
 
-bool PipewireAudio::create_input_node() {
+void SysAudioLinux::input_process_cb(void *app) {
+	static_cast<SysAudioLinux *>(app)->process_input_audio();
+}
+
+void SysAudioLinux::input_param_changed_cb(void *app, uint32_t id, const struct spa_pod *param) {
+	static_cast<SysAudioLinux *>(app)->input_param_changed(id, param);
+}
+
+void SysAudioLinux::input_state_changes_cb(void *app, enum pw_stream_state old, enum pw_stream_state state, const char *error) {
+	static_cast<SysAudioLinux *>(app)->input_state_changes(old, state, error);
+}
+
+bool SysAudioLinux::create_input_node() {
 	if (!core) {
 		return false;
 	}
@@ -163,17 +157,17 @@ bool PipewireAudio::create_input_node() {
 	return true;
 }
 
-bool PipewireAudio::start_capture(pid_t exclude_pid, AudioDataCallback callback) {
+bool SysAudioLinux::StartCapture(int exclude_pid, AudioDataCallback callback) {
 	if (is_capturing) {
 		return false;
 	}
 
-	excluded_pid = exclude_pid;
+	excluded_pid = static_cast<pid_t>(exclude_pid);
 	data_callback = callback;
 
 	// filter target_nodes by excluded_pid
 	for (auto it = target_nodes.begin(); it != target_nodes.end();) {
-		if (utils::is_pid_descendant_of(it->second, excluded_pid)) {
+		if (sysaudio::utils::is_pid_descendant_of(it->second, excluded_pid)) {
 			// remove node from target_nodes
 			uint32_t node_id = it->first;
 			it = target_nodes.erase(it);
@@ -195,10 +189,11 @@ bool PipewireAudio::start_capture(pid_t exclude_pid, AudioDataCallback callback)
 	}
 
 	is_capturing = true;
+	shared_buffer.set_capture_active(true);
 	return true;
 }
 
-bool PipewireAudio::stop_capture(bool preserve_state) {
+bool SysAudioLinux::stop_capture(bool preserve_state) {
 	printf("stop_capture::start\n");
 
 	if (thread_loop) {
@@ -207,6 +202,7 @@ bool PipewireAudio::stop_capture(bool preserve_state) {
 
 	is_capturing = false;
 	excluded_pid = 0;
+	shared_buffer.set_capture_active(false);
 
 	// destroy active links
 	for (auto &[node_id, links] : active_links) {
@@ -230,6 +226,7 @@ bool PipewireAudio::stop_capture(bool preserve_state) {
 	// always clear active_links and stream_ports
 	active_links.clear();
 	stream_ports.clear();
+	capture_stream_node_id = 0;
 
 	{
 		std::lock_guard<std::mutex> lock(callback_mutex);
@@ -254,7 +251,7 @@ bool PipewireAudio::stop_capture(bool preserve_state) {
 	return true;
 }
 
-void PipewireAudio::process_input_audio() {
+void SysAudioLinux::process_input_audio() {
 	if (!is_capturing || !capture_stream) {
 		return;
 	}
@@ -262,12 +259,13 @@ void PipewireAudio::process_input_audio() {
 	AudioDataCallback local_callback;
 	{
 		std::lock_guard<std::mutex> lock(callback_mutex);
-
-		if (!data_callback) {
-			return;
-		}
-
 		local_callback = data_callback;
+	}
+
+	const bool use_shared_buffer = !local_callback && shared_buffer.is_attached();
+
+	if (!local_callback && !use_shared_buffer) {
+		return;
 	}
 
 	pw_buffer *buf = pw_stream_dequeue_buffer(capture_stream);
@@ -290,10 +288,18 @@ void PipewireAudio::process_input_audio() {
 		return;
 	}
 
+	if (use_shared_buffer) {
+		shared_buffer.write_capture(static_cast<uint8_t *>(data->data), bytes);
+
+		// return the PipeWire buffer immediately
+		pw_stream_queue_buffer(capture_stream, buf);
+		return;
+	}
+
 	AudioFormat *format = new AudioFormat;
 	format->sampleRate = current_rate;
 	format->channels = current_channels;
-	format->bitsPerSample = utils::get_bytes_per_sample(static_cast<spa_audio_format>(current_format)) * 8;
+	format->bitsPerSample = sysaudio::utils::get_bytes_per_sample(static_cast<spa_audio_format>(current_format)) * 8;
 	format->format = current_format;
 
 	// copy data out of the PipeWire buffer before returning it
@@ -313,7 +319,7 @@ void PipewireAudio::process_input_audio() {
 	local_callback(frame);
 }
 
-void PipewireAudio::input_param_changed(uint32_t id, const struct spa_pod *param) {
+void SysAudioLinux::input_param_changed(uint32_t id, const struct spa_pod *param) {
 	if (param == nullptr || id != SPA_PARAM_Format) {
 		return;
 	}
@@ -329,9 +335,16 @@ void PipewireAudio::input_param_changed(uint32_t id, const struct spa_pod *param
 	current_format = static_cast<uint32_t>(info.format);
 	current_rate = info.rate;
 	current_channels = info.channels;
+
+	shared_buffer.set_format(
+		info.rate,
+		info.channels,
+		static_cast<uint32_t>(sysaudio::utils::get_bytes_per_sample(info.format) * 8),
+		current_format
+	);
 }
 
-void PipewireAudio::input_state_changes(enum pw_stream_state /*old*/, enum pw_stream_state state, const char *error) {
+void SysAudioLinux::input_state_changes(enum pw_stream_state /*old*/, enum pw_stream_state state, const char *error) {
 	printf("Input stream state changed: %s\n", pw_stream_state_as_string(state));
 
 	if (error) {
@@ -345,4 +358,3 @@ void PipewireAudio::input_state_changes(enum pw_stream_state /*old*/, enum pw_st
 		capture_stream_node_id = 0;
 	}
 }
-}  // namespace pipewire

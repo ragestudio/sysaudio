@@ -1,9 +1,12 @@
+#ifndef SYSAUDIO_RINGBUFFER_HPP
+#define SYSAUDIO_RINGBUFFER_HPP
+
 #include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <vector>
 
-namespace pipewire::ring_buffer {
+namespace sysaudio::ring_buffer {
 
 class RingBuffer {
    public:
@@ -61,4 +64,6 @@ class RingBuffer {
 	alignas(64) std::atomic<size_t> tail{ 0 };
 };
 
-}  // namespace pipewire::ring_buffer
+}  // namespace sysaudio::ring_buffer
+
+#endif	// SYSAUDIO_RINGBUFFER_HPP

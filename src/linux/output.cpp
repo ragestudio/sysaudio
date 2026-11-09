@@ -1,10 +1,33 @@
-#include "main.hpp"
-#include "output.hpp"
+#include <cstdio>
+#include <cstring>
 
-namespace pipewire {
-void output_process(void *userdata) {
-	PipewireAudio *instance = static_cast<PipewireAudio *>(userdata);
-	pw_buffer *buffObj = pw_stream_dequeue_buffer(instance->output_stream);
+#include "engine.hpp"
+
+const struct pw_stream_events SysAudioLinux::output_stream_events = {
+	.version = PW_VERSION_STREAM_EVENTS,
+	.destroy = nullptr,
+	.state_changed = &SysAudioLinux::output_state_changes_cb,
+	.control_info = nullptr,
+	.io_changed = nullptr,
+	.param_changed = nullptr,
+	.add_buffer = nullptr,
+	.remove_buffer = nullptr,
+	.process = &SysAudioLinux::output_process_cb,
+	.drained = nullptr,
+	.command = nullptr,
+	.trigger_done = nullptr,
+};
+
+void SysAudioLinux::output_process_cb(void *app) {
+	static_cast<SysAudioLinux *>(app)->process_output_audio();
+}
+
+void SysAudioLinux::output_state_changes_cb(void *app, enum pw_stream_state old, enum pw_stream_state state, const char *error) {
+	static_cast<SysAudioLinux *>(app)->output_state_changes(old, state, error);
+}
+
+void SysAudioLinux::process_output_audio() {
+	pw_buffer *buffObj = pw_stream_dequeue_buffer(output_stream);
 
 	if (!buffObj) {
 		return;
@@ -18,7 +41,13 @@ void output_process(void *userdata) {
 		req_bytes = data->maxsize;
 	}
 
-	size_t bytes_read = instance->output_buffer.read(static_cast<uint8_t *>(data->data), req_bytes);
+	size_t bytes_read = 0;
+
+	if (shared_buffer.is_attached()) {
+		bytes_read = shared_buffer.read_playback(static_cast<uint8_t *>(data->data), req_bytes);
+	} else {
+		bytes_read = output_buffer.read(static_cast<uint8_t *>(data->data), req_bytes);
+	}
 
 	if (bytes_read < req_bytes) {
 		memset(static_cast<uint8_t *>(data->data) + bytes_read, 0, req_bytes - bytes_read);
@@ -28,38 +57,25 @@ void output_process(void *userdata) {
 	data->chunk->size = req_bytes;
 	data->chunk->stride = 4;
 
-	pw_stream_queue_buffer(instance->output_stream, buffObj);
+	pw_stream_queue_buffer(output_stream, buffObj);
 }
 
-void output_state_changes(void *userdata, enum pw_stream_state old, enum pw_stream_state state, const char *error) {
-	PipewireAudio *instance = static_cast<PipewireAudio *>(userdata);
-
+void SysAudioLinux::output_state_changes(enum pw_stream_state /*old*/, enum pw_stream_state state, const char *error) {
 	printf("Output stream state changed: %s\n", pw_stream_state_as_string(state));
+
+	if (error) {
+		printf("Stream error: %s\n", error);
+	}
 
 	if (state == PW_STREAM_STATE_STREAMING) {
 		// update the stream node id
-		instance->output_stream_node_id = pw_stream_get_node_id(instance->output_stream);
+		output_stream_node_id = pw_stream_get_node_id(output_stream);
 	} else if (state != PW_STREAM_STATE_STREAMING) {
-		instance->output_stream_node_id = 0;
+		output_stream_node_id = 0;
 	}
 }
 
-const struct pw_stream_events output_stream_events = {
-	.version = PW_VERSION_STREAM_EVENTS,
-	.destroy = nullptr,
-	.state_changed = output_state_changes,
-	.control_info = nullptr,
-	.io_changed = nullptr,
-	.param_changed = nullptr,
-	.add_buffer = nullptr,
-	.remove_buffer = nullptr,
-	.process = output_process,
-	.drained = nullptr,
-	.command = nullptr,
-	.trigger_done = nullptr,
-};
-
-bool PipewireAudio::create_output_node() {
+bool SysAudioLinux::create_output_node() {
 	if (!core) {
 		return false;
 	}
@@ -69,7 +85,7 @@ bool PipewireAudio::create_output_node() {
 	pw_properties *props = pw_properties_new(
 		PW_KEY_MEDIA_TYPE, "Audio",
 		PW_KEY_MEDIA_CATEGORY, "Playback",
-		PW_KEY_NODE_NAME, node_name.c_str(),
+		PW_KEY_NODE_NAME, output_node_name.c_str(),
 		PW_KEY_NODE_DESCRIPTION, "System-wide audio output",
 		PW_KEY_APP_ID, app_id.c_str(),
 		PW_KEY_APP_NAME, app_name.c_str(),
@@ -84,7 +100,7 @@ bool PipewireAudio::create_output_node() {
 
 	output_stream = pw_stream_new_simple(
 		loop,
-		node_name.c_str(),
+		output_node_name.c_str(),
 		props,
 		&output_stream_events,
 		this
@@ -134,8 +150,10 @@ bool PipewireAudio::create_output_node() {
 	return true;
 }
 
-void PipewireAudio::push_to_output_buffer(AudioFrame *frame) {
+void SysAudioLinux::Output(AudioFrame *frame) {
+	if (!frame) {
+		return;
+	}
+
 	output_buffer.write(frame->buff, frame->size);
 }
-
-}  // namespace pipewire

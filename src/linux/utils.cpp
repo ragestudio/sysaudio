@@ -5,7 +5,7 @@
 
 #include "utils.hpp"
 
-namespace pipewire::utils {
+namespace sysaudio::utils {
 
 bool is_pid_descendant_of(pid_t child_pid, pid_t target_parent_pid) {
 	if (child_pid == target_parent_pid) {
@@ -185,4 +185,4 @@ bool validate_buffer_size(size_t bytes, const AudioFormat &format) {
 	return true;
 }
 
-}  // namespace pipewire::utils
+}  // namespace sysaudio::utils
